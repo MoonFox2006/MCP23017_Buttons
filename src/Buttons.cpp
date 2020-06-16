@@ -14,6 +14,31 @@ uint8_t Buttons::addButton(uint8_t pin, bool level) {
     if (result != ERR_INDEX) {
       _mcp->pinMode(pin, level ? INPUT : INPUT_PULLUP);
       _mcp->setupInterrupt(pin, true);
+      if (_mcp->digitalRead(pin)) {
+        _items[result].pressed = true;
+        putEvent(BTN_PRESSED, result);
+        if (_lastISR) {
+          uint32_t t = millis() - _lastISR;
+
+          if (t) {
+            for (uint8_t i = 0; i < result; ++i) {
+              if (_items[i].pressed) {
+                if (t + _items[i].duration >= 0x03FF) // 2^10
+                  _items[i].duration = 0x03FF;
+                else
+                  _items[i].duration += t;
+              } else if (_items[i].dbl) {
+                if (t >= _items[i].duration) {
+                  _items[i].dbl = false;
+                  _items[i].duration = 0;
+                } else
+                  _items[i].duration -= t;
+              }
+            }
+          }
+        }
+        _lastISR = millis();
+      }
     }
     return result;
   }
@@ -33,13 +58,11 @@ bool Buttons::match(uint8_t index, const void *t) {
 }
 
 void Buttons::mcpCallback(uint16_t pins, uint16_t values) {
-  static uint32_t lastTime = 0;
-
   uint32_t time, t;
 
   time = millis();
-  if (lastTime)
-    t = time - lastTime;
+  if (_lastISR)
+    t = time - _lastISR;
   else
     t = 0;
   for (uint8_t i = 0; i < _count; ++i) {
@@ -83,5 +106,5 @@ void Buttons::mcpCallback(uint16_t pins, uint16_t values) {
       }
     }
   }
-  lastTime = time;
+  _lastISR = time;
 }

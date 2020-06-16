@@ -21,7 +21,7 @@ public:
     uint8_t data : 4;
   };
 
-  Buttons(MCP23017 &mcp, uint8_t intPin) : List<button_t, 16>(), _events(), _mcp(&mcp) {
+  Buttons(MCP23017 &mcp, uint8_t intPin) : List<button_t, 16>(), _events(), _mcp(&mcp), _lastISR(0) {
     _mcp->attachInterrupt(intPin, std::bind(&Buttons::mcpCallback, this, std::placeholders::_1, std::placeholders::_2));
   }
 
@@ -49,6 +49,7 @@ protected:
 
   Queue<event_t, 32> _events;
   MCP23017 *_mcp;
+  volatile uint32_t _lastISR;
 };
 
 #endif
